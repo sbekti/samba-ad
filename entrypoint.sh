@@ -4,7 +4,7 @@ set -e
 # Default variables
 : "${REALM:=EXAMPLE.COM}"
 : "${DOMAIN:=EXAMPLE}"
-: "${ADMIN_PASS:=Pa\$\$w0rd}"
+: "${ADMIN_PASS:=Change-Me-123}"
 : "${DNS_FORWARDER:=8.8.8.8}"
 : "${RPC_PORT_START:=50000}"
 : "${RPC_PORT_END:=50010}"
