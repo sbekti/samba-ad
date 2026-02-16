@@ -13,18 +13,21 @@ set -e
 : "${EXTERNAL_IP:=127.0.0.1}"
 
 # Set the system hostname to match the NetBIOS name
-# This requires CAP_SYS_ADMIN or privileged: true
 echo "Setting system hostname to ${NETBIOS_NAME}..."
 hostname "${NETBIOS_NAME}"
 
-# External IP Hack
-# Ensure the hostname resolves to the External/NodePort IP, not the Pod IP.
+# Clean up /etc/hosts to remove Docker's internal IP entry for the hostname
+# This ensures local resolution uses the External IP we inject
 if grep -q "${EXTERNAL_IP}" /etc/hosts; then
     echo "Host entry already exists."
 else
-    echo "Injecting External IP into /etc/hosts..."
-    # Map the NetBIOS name and FQDN to the external IP
-    echo "${EXTERNAL_IP} ${NETBIOS_NAME}.${REALM} ${NETBIOS_NAME}" >> /etc/hosts
+    echo "Patching /etc/hosts..."
+    cp /etc/hosts /etc/hosts.bak
+    # Remove lines matching the hostname to clear internal IP mapping
+    grep -v -i "[[:space:]]${NETBIOS_NAME}$" /etc/hosts.bak > /etc/hosts.new || true
+    # Prepend our External IP mapping
+    echo "${EXTERNAL_IP} ${NETBIOS_NAME}.${REALM} ${NETBIOS_NAME}" | cat - /etc/hosts.new > /etc/hosts
+    rm /etc/hosts.new
 fi
 
 # Check if domain is already provisioned
@@ -34,6 +37,8 @@ else
     echo "Provisioning domain..."
     rm -f /etc/samba/smb.conf
     
+    # Run provisioning
+    # --host-ip: Forces the initial DNS A record to the External IP
     samba-tool domain provision \
         --server-role=dc \
         --use-rfc2307 \
@@ -41,11 +46,16 @@ else
         --realm="${REALM}" \
         --domain="${DOMAIN}" \
         --adminpass="${ADMIN_PASS}" \
+        --host-ip="${EXTERNAL_IP}" \
         --option="dns forwarder = ${DNS_FORWARDER}" \
         --option="netbios name = ${NETBIOS_NAME}" \
         --option="rpc server port = ${RPC_PORT_START}-${RPC_PORT_END}" \
         --option="allow dns updates = ${DNS_UPDATE_MODE}" \
-        --option="ldap server require strong auth = no"
+        --option="ldap server require strong auth = no" \
+        --option="dns update command = /usr/bin/true"
+    
+    # "dns update command = /usr/bin/true" prevents samba_dnsupdate from 
+    # overwriting our External IP with the Pod IP on scheduled runs.
 fi
 
 echo "Starting Samba AD DC..."
