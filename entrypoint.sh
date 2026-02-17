@@ -4,17 +4,31 @@ set -e
 # Default variables
 : "${REALM:=EXAMPLE.COM}"
 : "${DOMAIN:=EXAMPLE}"
-: "${ADMIN_PASS:=Change-Me-123}"
+: "${ADMIN_PASS:=Passw0rd}"
 : "${DNS_FORWARDER:=8.8.8.8}"
 : "${RPC_PORT_START:=50000}"
-: "${RPC_PORT_END:=50010}"
+: "${RPC_PORT_END:=50019}"
 : "${DNS_UPDATE_MODE:=nonsecure and secure}"
 : "${NETBIOS_NAME:=DC1}"
 : "${EXTERNAL_IP:=127.0.0.1}"
 
+# Log resolved configuration
+echo "=== Samba AD DC Configuration ==="
+echo "  REALM:         ${REALM}"
+echo "  DOMAIN:        ${DOMAIN}"
+echo "  NETBIOS_NAME:  ${NETBIOS_NAME}"
+echo "  EXTERNAL_IP:   ${EXTERNAL_IP}"
+echo "  DNS_FORWARDER: ${DNS_FORWARDER}"
+echo "  RPC_PORTS:     ${RPC_PORT_START}-${RPC_PORT_END}"
+echo "  DNS_UPDATE:    ${DNS_UPDATE_MODE}"
+echo "================================="
+
 # Set the system hostname to match the NetBIOS name
 echo "Setting system hostname to ${NETBIOS_NAME}..."
 hostname "${NETBIOS_NAME}"
+if [ "$(hostname)" != "${NETBIOS_NAME}" ]; then
+    echo "WARNING: Failed to set hostname to ${NETBIOS_NAME}. Running as $(hostname)." >&2
+fi
 
 # Clean up /etc/hosts to remove Docker's internal IP entry for the hostname
 # This ensures local resolution uses the External IP we inject
